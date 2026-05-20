@@ -1,0 +1,510 @@
+cat > /mnt/user-data/outputs/dageng_sword.html << 'HTMLEOF'
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>大庚剑阵 - 手势结印互动</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700;900&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{width:100%;height:100%;overflow:hidden;background:#050508;font-family:'Noto Serif SC',serif;color:#fff}
+  #mainCanvas{position:fixed;top:0;left:0;width:100%;height:100%;z-index:1}
+  #loadingScreen{position:fixed;inset:0;background:#050508;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;transition:opacity 0.8s ease}
+  .load-title{font-size:clamp(18px,5vw,36px);font-weight:900;letter-spacing:8px;text-align:center;line-height:1.8;
+    background:linear-gradient(135deg,#FFD700,#36CFFB,#FF4A2C);
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+  .load-bar-wrap{width:280px;height:3px;background:rgba(255,215,0,0.15);border-radius:3px;overflow:hidden}
+  .load-bar{height:100%;background:linear-gradient(90deg,#FFD700,#36CFFB);width:0%;transition:width 0.4s;box-shadow:0 0 12px #FFD700}
+  .load-msg{font-size:12px;letter-spacing:4px;color:rgba(255,255,255,0.45)}
+  .load-error{font-size:12px;letter-spacing:2px;color:#FF4A2C;display:none;text-align:center;max-width:300px;line-height:2}
+  #permScreen{position:fixed;inset:0;background:rgba(5,5,8,0.98);z-index:150;display:none;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:40px}
+  .perm-icon{font-size:64px}
+  .perm-title{font-size:20px;letter-spacing:5px;color:#FFD700;text-align:center}
+  .perm-desc{font-size:14px;line-height:2;text-align:center;max-width:380px;letter-spacing:1px;color:rgba(255,255,255,0.7)}
+  .perm-btn{padding:18px 52px;background:transparent;border:1px solid rgba(255,215,0,0.6);color:#FFD700;
+    font-size:14px;letter-spacing:4px;cursor:pointer;border-radius:10px;transition:all 0.3s ease;-webkit-appearance:none;
+    box-shadow:0 0 10px rgba(255,215,0,0.2)}
+  .perm-btn:active{background:rgba(255,215,0,0.2)}
+  #hud{position:fixed;top:0;left:0;right:0;z-index:10;padding:env(safe-area-inset-top,16px) 24px 12px;
+    display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none;
+    background:linear-gradient(to bottom,rgba(0,0,0,0.6),transparent)}
+  .hud-l .t{font-size:14px;font-weight:700;letter-spacing:4px;color:#FFD700}
+  .hud-l .s{font-size:11px;letter-spacing:2px;color:rgba(255,255,255,0.35);margin-top:4px}
+  .hud-r{text-align:right}
+  .stat{font-size:11px;letter-spacing:2px;color:rgba(255,255,255,0.4);margin-bottom:4px}
+  .stat span{color:#36CFFB;font-weight:600}
+  #camWrap{position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 20px);right:20px;z-index:10;
+    border:1px solid rgba(255,215,0,0.3);border-radius:14px;overflow:hidden;width:128px;height:96px;
+    box-shadow:0 0 15px rgba(54,207,251,0.2)}
+  #inputVideo{width:128px;height:96px;object-fit:cover;transform:scaleX(-1);opacity:0.85;display:block}
+  #overlayCanvas{position:absolute;top:0;left:0;width:128px;height:96px;transform:scaleX(-1)}
+  #modeBadge{position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 20px);left:50%;transform:translateX(-50%);z-index:10;
+    padding:10px 24px;background:rgba(0,0,0,0.7);border:1px solid rgba(255,215,0,0.3);border-radius:24px;
+    font-size:12px;letter-spacing:4px;color:#FFD700;pointer-events:none;white-space:nowrap}
+  #guide{position:fixed;left:20px;bottom:calc(env(safe-area-inset-bottom,0px) + 80px);z-index:10;pointer-events:none}
+  .g-item{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  .g-icon{font-size:16px;width:22px;text-align:center;color:#36CFFB}
+  .g-text{font-size:11px;letter-spacing:2px;color:rgba(255,255,255,0.45)}
+  body::after{content:'';position:fixed;inset:0;z-index:50;pointer-events:none;
+    background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(255,215,0,0.02) 3px,rgba(255,215,0,0.02) 6px)}
+</style>
+</head>
+<body>
+<canvas id="mainCanvas"></canvas>
+<div id="loadingScreen">
+  <div class="load-title">大庚剑阵<br>DA GENG SWORD FORMATION</div>
+  <div class="load-bar-wrap"><div class="load-bar" id="loadBar"></div></div>
+  <div class="load-msg" id="loadMsg">加载剑阵阵法...</div>
+  <div class="load-error" id="loadError"></div>
+</div>
+<div id="permScreen">
+  <div class="perm-icon">📷</div>
+  <div class="perm-title">请开启摄像头权限</div>
+  <div class="perm-desc">通过手势结印催动大庚剑阵，所有运算均在本地完成，不会上传任何数据</div>
+  <button class="perm-btn" id="allowBtn">开启摄像头</button>
+</div>
+<div id="hud">
+  <div class="hud-l">
+    <div class="t">大庚剑阵</div>
+    <div class="s">手势结印 · 实时催动</div>
+  </div>
+  <div class="hud-r">
+    <div class="stat">状态: <span id="stStatus">待机</span></div>
+    <div class="stat">剑数: <span id="stCount">—</span></div>
+  </div>
+</div>
+<div id="camWrap">
+  <video id="inputVideo" autoplay playsinline muted></video>
+  <canvas id="overlayCanvas"></canvas>
+</div>
+<div id="modeBadge">✋ 张手 · 布开剑阵</div>
+<div id="guide">
+  <div class="g-item"><span class="g-icon">✋</span><span class="g-text">张手 展开剑阵</span></div>
+  <div class="g-item"><span class="g-icon">✊</span><span class="g-text">握拳 凝剑聚罡</span></div>
+  <div class="g-item"><span class="g-icon">☝️</span><span class="g-text">单指 剑气穿刺</span></div>
+  <div class="g-item"><span class="g-icon">🙌</span><span class="g-text">双手 剑阵轮转</span></div>
+</div>
+
+<!-- ✅ 修复1：改用更稳定的 unpkg CDN，并监听脚本加载错误 -->
+<script>
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.crossOrigin = 'anonymous';
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('脚本加载失败: ' + src));
+    document.head.appendChild(s);
+  });
+}
+</script>
+
+<script>
+// ===================== 全局常量 =====================
+const SWORD_COLOR = {
+  gold: '255, 215, 0',
+  cyan: '54, 207, 251',
+  fire: '255, 74, 44'
+};
+const MODE_CONFIG = {
+  attract: { name: '布开剑阵', emoji: '✋', color: SWORD_COLOR.gold },
+  repel:   { name: '凝剑聚罡', emoji: '✊', color: SWORD_COLOR.fire },
+  draw:    { name: '剑气穿刺', emoji: '☝️', color: SWORD_COLOR.cyan },
+  vortex:  { name: '剑阵轮转', emoji: '🙌', color: '180, 140, 255' }
+};
+
+let W, H, frameN = 0;
+const canvas = document.getElementById('mainCanvas');
+const ctx = canvas.getContext('2d');
+const oc = document.getElementById('overlayCanvas');
+const octx = oc.getContext('2d');
+
+// ===================== 音效（懒加载，不阻塞主流程） =====================
+let audioUnlocked = false;
+let lastPlayMode = '';
+let lastAudioTime = 0;
+const AUDIO_COOLDOWN = 600;
+let audioPool = {};
+
+function initAudio() {
+  // ✅ 修复2：音频懒加载，失败不影响主流程
+  const srcs = {
+    attract: "https://assets.mixkit.co/sfx/preview/mixkit-ethereal-wind-sweep-1182.mp3",
+    repel:   "https://assets.mixkit.co/sfx/preview/mixkit-impact-thud-2577.mp3",
+    draw:    "https://assets.mixkit.co/sfx/preview/mixkit-fast-swoosh-1347.mp3",
+    vortex:  "https://assets.mixkit.co/sfx/preview/mixkit-whirlwind-wind-1315.mp3"
+  };
+  for (const [k, src] of Object.entries(srcs)) {
+    try {
+      const a = new Audio(src);
+      a.volume = 0.25;
+      a.preload = 'none'; // ✅ 不预加载，避免跨域问题阻塞
+      audioPool[k] = a;
+    } catch(e) {}
+  }
+}
+
+function unlockAudio() {
+  if (audioUnlocked) return;
+  audioUnlocked = true;
+  initAudio();
+}
+
+function playModeAudio(mode) {
+  if (!audioUnlocked) return;
+  const now = Date.now();
+  if (now - lastAudioTime < AUDIO_COOLDOWN) return;
+  if (lastPlayMode === mode) return;
+  lastAudioTime = now;
+  lastPlayMode = mode;
+  const aud = audioPool[mode];
+  if (!aud) return;
+  try { aud.currentTime = 0; aud.play().catch(() => {}); } catch(e) {}
+}
+
+// ===================== 画布尺寸 =====================
+let resizeTimer;
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  oc.width = 128; oc.height = 96;
+}
+window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(resize, 100); });
+resize();
+
+// ===================== 剑粒子类 =====================
+class SwordParticle {
+  constructor() {
+    this.type = Math.floor(Math.random() * 3);
+    this.angle = Math.random() * Math.PI * 2;
+    this.rotSpeed = (Math.random() - 0.5) * 0.02;
+    this.init();
+  }
+  init() {
+    this.x = Math.random() * W;
+    this.y = Math.random() * H;
+    this.vx = (Math.random() - 0.5) * 1.5;
+    this.vy = (Math.random() - 0.5) * 1.5;
+    this.baseSize = 2 + Math.random() * 4;
+    this.size = this.baseSize;
+    this.life = Math.random();
+    this.maxLife = 0.6 + Math.random() * 0.4;
+    this.alpha = 0;
+    this.energy = 0;
+    this.trail = [];
+    this.color = SWORD_COLOR.gold;
+  }
+  update(handPoints, mode) {
+    this.trail.push({ x: this.x, y: this.y });
+    if (this.trail.length > 9) this.trail.shift();
+    this.life += 0.0028;
+    if (this.life > this.maxLife) { this.init(); return; }
+    const t = this.life / this.maxLife;
+    this.alpha = t < 0.1 ? t / 0.1 : t > 0.8 ? (1 - t) / 0.2 : 1;
+    this.energy *= 0.92;
+    this.angle += this.rotSpeed;
+    for (const p of handPoints) {
+      const dx = p.x - this.x;
+      const dy = p.y - this.y;
+      const dist = Math.hypot(dx, dy) || 0.001;
+      const range = 240;
+      if (dist < range) {
+        const force = Math.pow((range - dist) / range, 2) * 4;
+        this.energy = Math.max(this.energy, force / 4);
+        this.color = MODE_CONFIG[mode].color;
+        switch (mode) {
+          case 'attract': this.vx -= dx/dist*force*0.16; this.vy -= dy/dist*force*0.16; break;
+          case 'repel':   this.vx += dx/dist*force*0.24; this.vy += dy/dist*force*0.24; break;
+          case 'draw':    this.vx += dx/dist*force*0.08; this.vy += dy/dist*force*0.08; break;
+          case 'vortex':
+            const rad = Math.atan2(dy, dx) + Math.PI/2;
+            this.vx += Math.cos(rad)*force*0.13;
+            this.vy += Math.sin(rad)*force*0.13;
+            break;
+        }
+      }
+    }
+    this.vx = this.vx * 0.97 + (Math.random()-0.5)*0.2;
+    this.vy = this.vy * 0.97 + (Math.random()-0.5)*0.2;
+    const spd = Math.hypot(this.vx, this.vy);
+    if (spd > 8) { this.vx = this.vx/spd*8; this.vy = this.vy/spd*8; }
+    this.x += this.vx; this.y += this.vy;
+    if (this.x < -60) this.x = W+60; if (this.x > W+60) this.x = -60;
+    if (this.y < -60) this.y = H+60; if (this.y > H+60) this.y = -60;
+    this.size = this.baseSize + this.energy * 4;
+  }
+  draw() {
+    const [r,g,b] = this.color.split(',');
+    const a = this.alpha;
+    const energyA = this.alpha * this.energy;
+    if (this.trail.length > 3 && this.energy > 0.06) {
+      ctx.beginPath();
+      ctx.moveTo(this.trail[0].x, this.trail[0].y);
+      for (let i=1;i<this.trail.length;i++) ctx.lineTo(this.trail[i].x, this.trail[i].y);
+      ctx.strokeStyle = `rgba(${r},${g},${b},${energyA*0.2})`;
+      ctx.lineWidth = this.size*0.3; ctx.stroke();
+    }
+    ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.angle);
+    if (this.type === 0) {
+      ctx.beginPath(); ctx.moveTo(-this.size*2,0); ctx.lineTo(this.size*2,0);
+      ctx.strokeStyle=`rgba(${r},${g},${b},${a})`; ctx.lineWidth=this.size*0.4; ctx.stroke();
+    } else if (this.type === 1) {
+      ctx.beginPath(); ctx.moveTo(-this.size*3,0); ctx.lineTo(this.size*3,0);
+      ctx.strokeStyle=`rgba(${r},${g},${b},${a*0.8})`; ctx.lineWidth=this.size*0.2; ctx.stroke();
+    } else {
+      const glow = ctx.createRadialGradient(0,0,0,0,0,this.size*3);
+      glow.addColorStop(0,`rgba(${r},${g},${b},${a})`);
+      glow.addColorStop(1,`rgba(${r},${g},${b},0)`);
+      ctx.beginPath(); ctx.arc(0,0,this.size*3,0,Math.PI*2);
+      ctx.fillStyle=glow; ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
+// ===================== 特效辅助 =====================
+function drawSwordNet(particles) {
+  const linkDist = 80;
+  ctx.lineCap = 'round';
+  for (let i=0;i<particles.length;i++) {
+    const p1 = particles[i]; if (p1.energy < 0.05) continue;
+    for (let j=i+1;j<particles.length;j++) {
+      const p2 = particles[j]; if (p2.energy < 0.05) continue;
+      const dist = Math.hypot(p1.x-p2.x, p1.y-p2.y);
+      if (dist < linkDist) {
+        const alpha = (1-dist/linkDist)*Math.min(p1.alpha,p2.alpha)*0.3;
+        ctx.beginPath(); ctx.moveTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y);
+        ctx.strokeStyle=`rgba(${SWORD_COLOR.gold},${alpha})`; ctx.lineWidth=0.6; ctx.stroke();
+      }
+    }
+  }
+}
+
+function drawFormationBG() {
+  ctx.fillStyle = 'rgba(5,5,8,0.18)'; ctx.fillRect(0,0,W,H);
+  const cX=W/2, cY=H/2;
+  const bg = ctx.createRadialGradient(cX,cY,H*0.2,cX,cY,H*0.9);
+  bg.addColorStop(0,'rgba(255,215,0,0.04)'); bg.addColorStop(1,'rgba(5,5,8,0)');
+  ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
+}
+
+function drawHandAura(points, mode) {
+  const color = MODE_CONFIG[mode].color;
+  for (const pt of points) {
+    const aura = ctx.createRadialGradient(pt.x,pt.y,0,pt.x,pt.y,80);
+    aura.addColorStop(0,`rgba(${color},0.18)`); aura.addColorStop(1,`rgba(${color},0)`);
+    ctx.beginPath(); ctx.arc(pt.x,pt.y,80,0,Math.PI*2); ctx.fillStyle=aura; ctx.fill();
+  }
+}
+
+// ===================== 手势识别 =====================
+let handData = [];
+let currentMode = 'attract';
+const HAND_LINKS = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+
+function detectSwordMode(landmarks, handCount) {
+  if (!landmarks || !landmarks.length) return 'attract';
+  if (handCount >= 2) return 'vortex';
+  const lm = landmarks[0];
+  const fingerState = [
+    lm[8].y < lm[6].y, lm[12].y < lm[10].y,
+    lm[16].y < lm[14].y, lm[20].y < lm[18].y
+  ];
+  const openFinger = fingerState.filter(Boolean).length;
+  if (openFinger === 1 && fingerState[0]) return 'draw';
+  if (openFinger <= 1 && !fingerState[0]) return 'repel';
+  return 'attract';
+}
+
+function getHandScreenPoints(landmarks) {
+  const points = [];
+  const keyPoints = [0,4,8,12,16,20,9];
+  for (const lm of landmarks) {
+    for (const idx of keyPoints) {
+      points.push({ x: (1-lm[idx].x)*W, y: lm[idx].y*H });
+    }
+  }
+  return points;
+}
+
+function drawHandLandmarks() {
+  octx.clearRect(0,0,128,96);
+  if (!handData.length) return;  // ✅ 修复3：先清空再判断，避免残影
+  const lm = handData[0];
+  octx.strokeStyle = `rgba(${SWORD_COLOR.gold},0.6)`;
+  octx.lineWidth = 1.2;
+  for (const [a,b] of HAND_LINKS) {
+    octx.beginPath();
+    octx.moveTo(lm[a].x*128, lm[a].y*96);
+    octx.lineTo(lm[b].x*128, lm[b].y*96);
+    octx.stroke();
+  }
+  const tips = [4,8,12,16,20];
+  for (let i=0;i<lm.length;i++) {
+    octx.beginPath();
+    octx.arc(lm[i].x*128, lm[i].y*96, tips.includes(i)?4:2, 0, Math.PI*2);
+    octx.fillStyle = tips.includes(i)?`rgba(${SWORD_COLOR.gold},0.95)`:'rgba(255,255,255,0.7)';
+    octx.fill();
+  }
+}
+
+// ===================== 粒子系统 & 主循环 =====================
+const PARTICLE_COUNT = window.innerWidth < 768 ? 700 : 1100;
+const swordParticles = Array.from({length: PARTICLE_COUNT}, () => new SwordParticle());
+
+function animateLoop() {
+  requestAnimationFrame(animateLoop);
+  frameN++;
+  try {  // ✅ 修复4：渲染循环用 try/catch 保护，单帧错误不崩溃
+    drawFormationBG();
+    const handPoints = getHandScreenPoints(handData);
+    const newMode = detectSwordMode(handData, handData.length);
+    if (newMode !== currentMode) {
+      currentMode = newMode;
+      playModeAudio(currentMode);
+    }
+    for (const sp of swordParticles) sp.update(handPoints, currentMode);
+    drawSwordNet(swordParticles);
+    for (const sp of swordParticles) sp.draw();
+    drawHandAura(handPoints, currentMode);
+    drawHandLandmarks();
+    if (frameN % 12 === 0) {
+      const cfg = MODE_CONFIG[currentMode];
+      document.getElementById('modeBadge').textContent = `${cfg.emoji} ${cfg.name}`;
+      document.getElementById('stStatus').textContent = handData.length > 0 ? '结印中' : '待机';
+    }
+  } catch(e) { console.warn('渲染帧错误:', e); }
+}
+
+// ===================== 加载进度 =====================
+function setLoadProgress(pct, msg) {
+  document.getElementById('loadBar').style.width = pct + '%';
+  document.getElementById('loadMsg').textContent = msg;
+}
+function showLoadError(msg) {
+  const el = document.getElementById('loadError');
+  el.textContent = msg;
+  el.style.display = 'block';
+  document.getElementById('loadMsg').style.display = 'none';
+}
+
+// ===================== MediaPipe 初始化 =====================
+function initMediaPipe(video) {
+  return new Promise((resolve, reject) => {
+    // ✅ 修复5：检查 Hands/Camera 是否真正可用
+    if (typeof Hands === 'undefined' || typeof Camera === 'undefined') {
+      reject(new Error('MediaPipe 未加载'));
+      return;
+    }
+    const hands = new Hands({
+      locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/${file}`
+    });
+    hands.setOptions({
+      maxNumHands: 2,
+      modelComplexity: 1,  // ✅ 修复6：降至1，降低首次加载失败率
+      minDetectionConfidence: 0.7,
+      minTrackingConfidence: 0.6
+    });
+    hands.onResults(res => {
+      handData = res.multiHandLandmarks || [];
+    });
+
+    const camera = new Camera(video, {
+      onFrame: async () => {
+        try { await hands.send({image: video}); } catch(e) {}
+      },
+      width: 640, height: 480
+    });
+
+    camera.start().then(resolve).catch(reject);
+  });
+}
+
+// 请求摄像头
+function requestCamera() {
+  setLoadProgress(70, '请求摄像权限...');
+  navigator.mediaDevices.getUserMedia({
+    video: { width:{ideal:640}, height:{ideal:480}, facingMode:'user' }
+  })
+  .then(stream => {
+    const video = document.getElementById('inputVideo');
+    video.srcObject = stream;
+    return new Promise(r => { video.onloadedmetadata = r; });
+  })
+  .then(() => {
+    setLoadProgress(85, '载入剑阵识纹...');
+    return initMediaPipe(document.getElementById('inputVideo'));
+  })
+  .then(() => {
+    setLoadProgress(100, '剑阵启动成功 ✓');
+    document.getElementById('stCount').textContent = PARTICLE_COUNT;
+    setTimeout(() => {
+      const ls = document.getElementById('loadingScreen');
+      ls.style.opacity = '0';
+      setTimeout(() => ls.style.display = 'none', 900);
+    }, 600);
+  })
+  .catch(err => {
+    console.error(err);
+    // 摄像头权限被拒
+    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+      document.getElementById('permScreen').style.display = 'flex';
+      setLoadProgress(65, '等待权限授权');
+    } else {
+      showLoadError('加载失败：' + err.message + '\n请刷新页面重试');
+    }
+  });
+}
+
+// ===================== 启动入口 =====================
+async function bootSystem() {
+  animateLoop(); // 先启动粒子动画
+  setLoadProgress(10, '加载 MediaPipe 脚本...');
+
+  const allowBtn = document.getElementById('allowBtn');
+  allowBtn.onclick = () => {
+    document.getElementById('permScreen').style.display = 'none';
+    unlockAudio();
+    requestCamera();
+  };
+
+  try {
+    // ✅ 修复7：用 Promise 串行加载，确保依赖顺序正确
+    await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3/camera_utils.js');
+    setLoadProgress(30, '加载摄像工具...');
+    await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3/drawing_utils.js');
+    setLoadProgress(50, '加载绘制工具...');
+    await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/hands.js');
+    setLoadProgress(65, '阵法初始化完成');
+    requestCamera();
+  } catch(err) {
+    console.error('CDN 加载失败:', err);
+    // ✅ 回退：尝试备用 CDN
+    setLoadProgress(20, '主 CDN 失败，尝试备用...');
+    try {
+      await loadScript('https://unpkg.com/@mediapipe/camera_utils@0.3/camera_utils.js');
+      await loadScript('https://unpkg.com/@mediapipe/drawing_utils@0.3/drawing_utils.js');
+      await loadScript('https://unpkg.com/@mediapipe/hands@0.4/hands.js');
+      setLoadProgress(65, '阵法初始化完成（备用源）');
+      requestCamera();
+    } catch(err2) {
+      showLoadError('网络资源加载失败\n请检查网络连接后刷新重试\n\n' + err2.message);
+    }
+  }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && audioUnlocked) {
+    Object.values(audioPool).forEach(a => { try { a.currentTime = 0; } catch(e){} });
+  }
+});
+
+window.addEventListener('load', bootSystem);
+</script>
+</body>
+</html>
+HTMLEOF
+echo "Done"
